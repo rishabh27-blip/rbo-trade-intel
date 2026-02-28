@@ -1,0 +1,194 @@
+import { useMemo } from 'react'
+import { load, KEYS } from '../utils/storage.js'
+import { calcPerformanceStats, fmt } from '../utils/calculations.js'
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
+} from 'recharts'
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Trade #{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ fontSize: 12, color: p.color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+          {p.name}: {p.name === 'P&L' ? fmt.currency(p.value, 0) : fmt.currency(p.value, 0)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function Dashboard() {
+  const trades = load(KEYS.TRADES, [])
+  const stats = useMemo(() => calcPerformanceStats(trades), [trades])
+  const hasData = stats.totalTrades > 0
+
+  const MetricCard = ({ label, value, sub, colorClass }) => (
+    <div className="metric-card">
+      <div className="metric-label">{label}</div>
+      <div className={`metric-value ${colorClass || ''}`}>{value}</div>
+      {sub && <div className="metric-sub">{sub}</div>}
+    </div>
+  )
+
+  const BucketRow = ({ label, data, colorClass }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{label}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{data.count} trades</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div className={`mono`} style={{ fontSize: 14, fontWeight: 700, color: data.avg >= 0 ? 'var(--green)' : 'var(--red)' }}>
+          {fmt.currency(data.avg, 0)}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+          Win: {fmt.pct(data.winRate, 1)}
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="module-header">
+        <div>
+          <div className="module-title">📈 KPI Dashboard</div>
+          <div className="module-subtitle">Live performance analytics — trade history learning loop</div>
+        </div>
+        {hasData && (
+          <span className={`badge ${stats.totalPnL >= 0 ? 'badge-green' : 'badge-red'}`}>
+            {fmt.currency(stats.totalPnL, 0)}
+          </span>
+        )}
+      </div>
+
+      {!hasData ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>No data yet</div>
+          <div style={{ fontSize: 12 }}>Log your first trade in the Trade Engine to unlock the dashboard</div>
+        </div>
+      ) : (
+        <>
+          {/* KPI Grid */}
+          <div className="card-grid module-section">
+            <MetricCard label="Total P&L" value={fmt.currency(stats.totalPnL, 0)}
+              colorClass={stats.totalPnL >= 0 ? 'green' : 'red'} sub={`${stats.totalTrades} trades`} />
+            <MetricCard label="Win Rate" value={fmt.pct(stats.winRate, 1)}
+              colorClass={stats.winRate >= 55 ? 'green' : stats.winRate >= 45 ? 'gold' : 'red'}
+              sub={`${stats.wins}W / ${stats.losses}L`} />
+            <MetricCard label="Profit Factor" value={stats.profitFactor === Infinity ? '∞' : fmt.num(stats.profitFactor, 2)}
+              colorClass={stats.profitFactor >= 1.5 ? 'green' : stats.profitFactor >= 1 ? 'gold' : 'red'}
+              sub="Win:Loss ratio" />
+            <MetricCard label="Sharpe Ratio" value={fmt.num(stats.sharpe, 2)}
+              colorClass={stats.sharpe >= 1 ? 'green' : stats.sharpe >= 0 ? 'gold' : 'red'}
+              sub="Annualized" />
+            <MetricCard label="Avg Win" value={fmt.currency(stats.avgWin, 0)} colorClass="green" sub="Per trade" />
+            <MetricCard label="Avg Loss" value={`-${fmt.currency(stats.avgLoss, 0)}`} colorClass="red" sub="Per trade" />
+            <MetricCard label="Max Drawdown" value={fmt.pct(stats.maxDDPct, 1)} colorClass="red"
+              sub={fmt.currency(stats.maxDD, 0)} />
+            <MetricCard label="Trades" value={stats.totalTrades} colorClass="blue" sub="Logged" />
+          </div>
+
+          {/* Equity Curve */}
+          {stats.equityData?.length > 1 && (
+            <div className="card module-section">
+              <div className="card-title mb-3">📈 Equity Curve (Cumulative P&L)</div>
+              <div className="chart-container">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.equityData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={stats.totalPnL >= 0 ? '#00E5A0' : '#FF4757'} stopOpacity={0.25} />
+                        <stop offset="95%" stopColor={stats.totalPnL >= 0 ? '#00E5A0' : '#FF4757'} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="trade" stroke="transparent" tick={{ fill: 'var(--text-3)', fontSize: 10 }} />
+                    <YAxis stroke="transparent" tick={{ fill: 'var(--text-3)', fontSize: 10 }}
+                      tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={0} stroke="var(--border-light)" strokeDasharray="4 4" />
+                    <Area type="monotone" dataKey="pnl" name="P&L" stroke={stats.totalPnL >= 0 ? '#00E5A0' : '#FF4757'}
+                      strokeWidth={2} fill="url(#pnlGrad)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Per-Trade P&L bars */}
+          {stats.equityData?.length > 0 && (
+            <div className="card module-section">
+              <div className="card-title mb-3">📊 Trade-by-Trade P&L</div>
+              <div className="chart-container">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.equityData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="trade" stroke="transparent" tick={{ fill: 'var(--text-3)', fontSize: 10 }} />
+                    <YAxis stroke="transparent" tick={{ fill: 'var(--text-3)', fontSize: 10 }}
+                      tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={0} stroke="var(--border-light)" />
+                    <Bar dataKey="daily" name="P&L"
+                      fill="#00E5A0"
+                      radius={[3, 3, 0, 0]}
+                      isAnimationActive={true}
+                      label={false}
+                    >
+                      {stats.equityData.map((entry, idx) => (
+                        <rect key={idx} fill={entry.daily >= 0 ? '#00E5A0' : '#FF4757'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Score Bucket Analysis */}
+          {stats.buckets && (
+            <div className="card module-section">
+              <div className="card-title mb-3">🎯 Score Bucket Analysis</div>
+              <div className="text-sm text-muted mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
+                Which score ranges are actually profitable?
+              </div>
+              <BucketRow label="HIGH Score (70+)" data={stats.buckets.high} />
+              <BucketRow label="MID Score (50–69)" data={stats.buckets.mid} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>LOW Score (&lt;50)</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{stats.buckets.low.count} trades</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className={`mono`} style={{ fontSize: 14, fontWeight: 700, color: stats.buckets.low.avg >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {fmt.currency(stats.buckets.low.avg, 0)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                    Win: {fmt.pct(stats.buckets.low.winRate, 1)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Insight */}
+              <div className="divider" />
+              <div className="warning-item info" style={{ marginTop: 8 }}>
+                💡 {
+                  stats.buckets.high.winRate > 65
+                    ? `High-score trades winning ${fmt.pct(stats.buckets.high.winRate, 0)} — stick to 70+ threshold`
+                    : stats.buckets.mid.avg > stats.buckets.high.avg && stats.buckets.mid.count > 2
+                    ? 'Mid-range trades outperforming — consider recalibrating threshold to 55+'
+                    : stats.totalTrades < 10
+                    ? `${10 - stats.totalTrades} more trades needed for reliable pattern analysis`
+                    : 'Review trade log — identify which parameters correlate with wins'
+                }
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
