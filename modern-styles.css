@@ -1,0 +1,70 @@
+.dashboard {
+    background-color: #f4f4f4; /* Light gray background for the main dashboard area */
+    color: #333; /* Dark gray text color for better readability */
+    font-family: 'Arial', sans-serif; /* Modern sans-serif font for a clean look */
+    display: flex;
+    flex-direction: column;
+    padding: 20px; /* Padding around the dashboard content */
+}
+
+.header {
+    background-color: #007bff; /* Blue background for the header */
+    color: white; /* White text color for the header */
+    padding: 15px;
+    text-align: center; /* Center the header text */
+    font-size: 24px;
+}
+
+.navbar {
+    background-color: #343a40; /* Dark background for the navbar */
+    padding: 10px;
+}
+
+.navbar a {
+    color: white; /* White text color for navbar links */
+    padding: 10px 15px;
+    text-decoration: none;
+}
+
+.navbar a:hover {
+    background-color: #495057; /* Darker shade on hover for navbar links */
+}
+
+.main-content {
+    flex-grow: 1; /* Take up remaining space in the dashboard */
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.card {
+    background-color: white; /* White background for cards */
+    border: 1px solid #dee2e6; /* Light gray border for cards */
+    border-radius: 4px; /* Slightly rounded corners for cards */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for elevation effect */
+    margin: 10px;
+    flex: 1 1 calc(30% - 20px); /* Responsive card layout */
+}
+
+.card h3 {
+    font-size: 20px;
+    color: #007bff; /* Blue for headings */
+}
+
+.chart {
+    width: 100%; /* Full width for charts */
+    height: 300px; /* Fixed height for charts */
+}
+
+.footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .card {
+        flex: 1 1 calc(100% - 20px); /* Stack cards on smaller screens */
+    }
+}
